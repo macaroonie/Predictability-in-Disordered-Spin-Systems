@@ -91,10 +91,8 @@ def spin_test():
     active_dict_1 = {}
     for key in spin_dict_1:
         active_dict_1[key] = spin_dict_1[key]
-# print(active_dict)
     while active_dict_1:
         t = monte_carlo(t, spin_dict_1, active_dict_1)
-    # print("Twin 1 has reached absorbing state.")
 
     t = 0
     while t < switch_time: # t measured in sweeps - one sweep = N spin-flip attempts
@@ -103,10 +101,8 @@ def spin_test():
     active_dict_2 = {}
     for key in spin_dict_2:
         active_dict_2[key] = spin_dict_1[key]
-    # print(active_dict)
     while active_dict_2:
         t = monte_carlo(t, spin_dict_2, active_dict_2)
-    # print("Twin 2 has reached absorbing state.")
     q = q_infinity(100)
     return q
 
