@@ -300,24 +300,26 @@ def spin_test(spin_dict_1, spin_dict_2, dim, switch_time):
     q = overlap(spin_dict_1, spin_dict_2)
     return [q, (t1+t2)/2]
 
-dim = 7
+dim = 2
 d = 10 # length of one side
 # k = 5
-k_count = 6
+k_count = 0
 switch_time = 10
 
 if k_count >= dim:
     print("k-count cannot be greater than or equal to the number of dimensions.")
     exit(1)
-k_list = [4,5,6,7,8,9]
+k_list = [6]
 for k in k_list:
-    print(f"{k} layers")
+    if k_count == 0:
+        k = 0
+    print(f"k = {k}")
     spin_count = d**(dim - k_count) * k**(k_count)
 
     neighbor_cable = create_neighbor_cable(d, dim, k=k, k_count=k_count)
     q_list = []
     t_list = []
-    max_runs = 30000
+    max_runs = 1000
     for run in range(1, max_runs+1):
         J = create_coupling_arr(d, dim, k=k, k_count=k_count)
         spin_dict_1 = {} # list of spins
@@ -345,7 +347,7 @@ for k in k_list:
     print(f"    Standard deviation: {std}")
     print(f"    Mean survival time: {mean_time}")
     
-    with open('7Dlayers.csv', 'a', newline='') as csvfile:
+    with open('2Dlayers.csv', 'a', newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow([k, mean, std, mean_time, id])
 
