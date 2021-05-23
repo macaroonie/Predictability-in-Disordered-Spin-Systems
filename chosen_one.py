@@ -282,34 +282,35 @@ def overlap(spin_dict_1, spin_dict_2):
     total_overlap = total_overlap/len(spin_dict_1)
     return total_overlap
 
-def spin_test(spin_dict_1, spin_dict_2, dim, switch_time):
+def spin_test(spin_dict_1, spin_dict_2, dim, switch_time=0):
     t1 = 0
-    while t1 < switch_time: # time in sweeps - 1 sweep = N spin-flip attempts
-        t1 = glauber(t1, spin_dict_1, dim)
+    # while t1 < switch_time: # time in sweeps - 1 sweep = N spin-flip attempts
+    #     t1 = glauber(t1, spin_dict_1, dim)
     active_dict_1 = create_active(spin_dict_1, dim)
     while active_dict_1:
         t1 = monte_carlo(t1, spin_dict_1, active_dict_1, dim)
-    # print("Twin 1 has reached absorbing state.")
+        
     t2 = 0
-    while t2 < switch_time:
-        t2 = glauber(t2, spin_dict_2, dim)
+    # while t2 < switch_time:
+    #     t2 = glauber(t2, spin_dict_2, dim)
     active_dict_2 = create_active(spin_dict_2, dim)
     while active_dict_2:
         t2 = monte_carlo(t2, spin_dict_2, active_dict_2, dim)
-    # print("Twin 2 has reached absorbing state.")
+        
     q = overlap(spin_dict_1, spin_dict_2)
     return [q, (t1+t2)/2]
 
-dim = 2
+dim = 7
 d = 10 # length of one side
 # k = 5
-k_count = 0
-switch_time = 10
+k_count = 6
+max_runs = 3000
+# switch_time = 10
 
 if k_count >= dim:
     print("k-count cannot be greater than or equal to the number of dimensions.")
     exit(1)
-k_list = [6]
+k_list = [4]
 for k in k_list:
     if k_count == 0:
         k = 0
@@ -319,7 +320,6 @@ for k in k_list:
     neighbor_cable = create_neighbor_cable(d, dim, k=k, k_count=k_count)
     q_list = []
     t_list = []
-    max_runs = 1000
     for run in range(1, max_runs+1):
         J = create_coupling_arr(d, dim, k=k, k_count=k_count)
         spin_dict_1 = {} # list of spins
@@ -331,23 +331,26 @@ for k in k_list:
         for key in spin_dict_1:
             spin_dict_2[key] = spin_dict_1[key]
         
-        results = spin_test(spin_dict_1, spin_dict_2, dim, switch_time)
+        results = spin_test(spin_dict_1, spin_dict_2, dim)
         q = results[0]
         t = results[1]
         q_list.append(q)
         t_list.append(t)
-        id = f"[{dim},{d},{k},{k_count},{max_runs},{switch_time}]"
+        id = f"[{dim},{d},{k},{k_count},{max_runs}]"
+        with open('7DlayersA.csv', 'a', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow([k, q, t, id])
         print(f"{id}: Spin test: {run}\n     Overlap: {q}\n     Time : {t} sweeps")
     mean = np.mean(q_list)
     std = np.std(q_list)
     mean_time = np.mean(t_list)
 
-    print(f"{dim}-dimensional model with side-length {d}, k = {k}, k count = {k_count}, {max_runs} runs, switch_time = {switch_time} sweeps")
+    print(f"{dim}-dimensional model with side-length {d}, k = {k}, k count = {k_count}, {max_runs} runs")
     print(f"    Mean overlap: {mean}")
     print(f"    Standard deviation: {std}")
     print(f"    Mean survival time: {mean_time}")
     
-    with open('2Dlayers.csv', 'a', newline='') as csvfile:
+    with open('7Dlayers.csv', 'a', newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow([k, mean, std, mean_time, id])
 
