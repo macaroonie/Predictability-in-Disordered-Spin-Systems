@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 import csv
-
+import os
 
 def get_shape(d, dim, k, k_count):
     if dim == 1:
@@ -125,100 +125,88 @@ def get_shape(d, dim, k, k_count):
         else:
             return (d,d,d,d,d,d,d,d,d,d)
 
+# side_len - length of unchanging dimensions
+# k - varied dimension length
+# k_count - number of varying dimensions
 def create_neighbor_cable(side_len, dim, k=0, k_count=0):
     spin_count = side_len**(dim - k_count) * k**(k_count)
     neighbor_cable =  [[] for _ in range(spin_count)]
     
     for spin in range(0, spin_count):
-        # print(f"spin = {spin}")
-        side_arr = []
-        vol_arr = []
+        coord_arr = []
+        coeff_arr = []
         if k_count == 0:
-            n = 1
+            n = 1 # base case
         else:
             n = k_count
-        d = dim - n
+        exp = dim - n
         tmp_spin = spin
-        while d >= 0:
-            face_vol = side_len**d * k**(n-1)
-            vol_arr.append(face_vol)
-            side = tmp_spin // face_vol
-            # print(f"side = {side}")
-            side_arr.append(side)
+        while exp >= 0:
+            face_vol = side_len**exp * k**(n-1)
+            coeff_arr.append(face_vol)
+            coord = tmp_spin // face_vol
+            coord_arr.append(coord)
             tmp_spin = tmp_spin % face_vol
             if n > 1:
                 n -= 1
             else:
-                d -= 1
+                exp -= 1
                 
-        for i in range(0, len(side_arr)):
-            spin_sum = 0
-            # calculate contribution of all aisles except specified aisle i
-            for j in range(0, len(side_arr)):
-                if i == j:
-                    continue
-                spin_sum += side_arr[j] * vol_arr[j]
+        for i in range(0, len(coord_arr)):
+            # spin_omitted - value of spin excluding contribution of specified index
+            spin_omitted = spin - coord_arr[i]*coeff_arr[i]
             
             # 2 neighbors in specified aisle i
             if k_count > i:
-                if side_arr[i] == 0:
-                    neighbor_1 = spin_sum + (k-1) * vol_arr[i]
-                    neighbor_2 = spin_sum + (side_arr[i]+1) * vol_arr[i]
-                elif side_arr[i] == k-1:
-                    neighbor_1 = spin_sum + (side_arr[i]-1) * vol_arr[i]
-                    neighbor_2 = spin_sum # at row 0
-                else:
-                    neighbor_1 = spin_sum + (side_arr[i]-1) * vol_arr[i]
-                    neighbor_2 = spin_sum + (side_arr[i]+1) * vol_arr[i]
+                coord_1 = (coord_arr[i]-1) % k
+                coord_2 = (coord_arr[i]+1) % k
             else:
-                if side_arr[i] == 0:
-                    neighbor_1 = spin_sum + (side_len-1) * vol_arr[i]
-                    neighbor_2 = spin_sum + (side_arr[i]+1) * vol_arr[i]
-                elif side_arr[i] == side_len-1:
-                    neighbor_1 = spin_sum + (side_arr[i]-1) * vol_arr[i]
-                    neighbor_2 = spin_sum # at row 0
-                else:
-                    neighbor_1 = spin_sum + (side_arr[i]-1) * vol_arr[i]
-                    neighbor_2 = spin_sum + (side_arr[i]+1) * vol_arr[i]
+                coord_1 = (coord_arr[i]-1) % side_len
+                coord_2 = (coord_arr[i]+1) % side_len
+            neighbor_1 = spin_omitted + (coord_1) * coeff_arr[i]
+            neighbor_2 = spin_omitted + (coord_2) * coeff_arr[i]
+
             neighbor_cable[spin].append(neighbor_1)
             neighbor_cable[spin].append(neighbor_2)
     return neighbor_cable
 
 def create_coupling_arr(side_len, dim, k=0, k_count=0):
     spin_count = side_len**(dim - k_count) * k**(k_count)
+    # J - array indexed by spin number
+    # J[i] returns the coupling coefficients between all neighbors and spin i
     J =  [[] for _ in range(spin_count)]
     normal_arr = [[] for _ in range(dim)]
+    
+    # creating all coupling coefficients
     for i in range(0, dim):
         normal_arr[i] = np.random.normal(0, 1, size = get_shape(side_len, dim, k, k_count))
 
+    # storing spin coupling coefficients
     for spin in range(0, spin_count):
-        side_arr = []
+        coord_arr = []
         if k_count == 0:
             n = 1
         else:
             n = k_count
-        d = dim - n
+        exp = dim - n
         tmp_spin = spin
-        while d >= 0:
-            face_vol = side_len**d * k**(n-1)
+        while exp >= 0:
+            face_vol = side_len**exp * k**(n-1)
             side = tmp_spin // face_vol
-            side_arr.append(side)
+            coord_arr.append(side)
             tmp_spin = tmp_spin % face_vol
             if n > 1:
                 n -= 1
             else:
-                d -= 1
+                exp -= 1
 
-        for i in range(0, len(side_arr)):
-            spin_sum = 0
-            side_arr[i] -= 1
-            neighbor_1 = normal_arr[i][tuple(side_arr)]
-            side_arr[i] += 1
-            neighbor_2 = normal_arr[i][tuple(side_arr)]
+        for i in range(0, len(coord_arr)):
+            coord_arr[i] -= 1
+            neighbor_1 = normal_arr[i][tuple(coord_arr)] if normal_arr[i][tuple(coord_arr)] > 0 else normal_arr[i][tuple(coord_arr)] * -1
+            coord_arr[i] += 1
+            neighbor_2 = normal_arr[i][tuple(coord_arr)] if normal_arr[i][tuple(coord_arr)] > 0 else normal_arr[i][tuple(coord_arr)] * -1
             J[spin].append(neighbor_1)
             J[spin].append(neighbor_2)
-            # print(f"neighbor 1 = {neighbor_1}")
-            # print(f"neighbor 2 = {neighbor_2}")
     return J
 
 def ham(spin, spin_dict, dim): #compute energy given a spin site number
@@ -229,7 +217,7 @@ def ham(spin, spin_dict, dim): #compute energy given a spin site number
         sum -= J[spin][i]*spin_value*spin_dict[nbr]
     return sum
 
-def can_flip(spin, spin_dict, dim):
+def flippable(spin, spin_dict, dim):
     energy_unflipped = ham(spin, spin_dict, dim)
     if energy_unflipped > 0:
         return True
@@ -239,7 +227,7 @@ def can_flip(spin, spin_dict, dim):
 def create_active(spin_dict, dim):
     active_dict = {}
     for i in range(len(spin_dict)):
-        if can_flip(i, spin_dict, dim):
+        if flippable(i, spin_dict, dim):
             active_dict[i] = spin_dict[i]
     return active_dict
 
@@ -247,7 +235,7 @@ def glauber(t, spin_dict, dim):
     t += 1/len(spin_dict)
     random.seed()
     spin = random.randint(0, len(spin_dict)-1)
-    if can_flip(spin, spin_dict, dim):
+    if flippable(spin, spin_dict, dim):
         spin_dict[spin] = spin_dict[spin] * (-1)
     return t
 
@@ -267,10 +255,10 @@ def monte_carlo(t, spin_dict, active_dict, dim):
     # if neighbor can be flipped and not in active list, add to list
     # if neighbor cannot be flipped and in active list, remove from list
     for nbr in neighbor_cable[spin]:
-        if can_flip(nbr, spin_dict, dim) and nbr not in active_dict.keys():
+        if flippable(nbr, spin_dict, dim) and nbr not in active_dict.keys():
             active_dict[nbr] = spin_dict[nbr]
             # print(f"    Neighbor spin site {nbr} added to active list.")
-        elif not can_flip(nbr, spin_dict, dim) and nbr in active_dict.keys():
+        elif not flippable(nbr, spin_dict, dim) and nbr in active_dict.keys():
             active_dict.pop(nbr)
             # print(f"    Neighbor spin site {nbr} removed from active list.")
     return t
@@ -300,21 +288,21 @@ def spin_test(spin_dict_1, spin_dict_2, dim, switch_time=0):
     q = overlap(spin_dict_1, spin_dict_2)
     return [q, (t1+t2)/2]
 
-dim = 7
-d = 10 # length of one side
+dim = 5
+d = 20 # length of one side
 # k = 5
-k_count = 6
-max_runs = 3000
+k_count = 4
+max_runs = 4000
 # switch_time = 10
 
 if k_count >= dim:
     print("k-count cannot be greater than or equal to the number of dimensions.")
     exit(1)
-k_list = [4]
+k_list = [10]  
 for k in k_list:
     if k_count == 0:
         k = 0
-    print(f"k = {k}")
+    print(f"k = {k}, d = {d}, dim = {dim}")
     spin_count = d**(dim - k_count) * k**(k_count)
 
     neighbor_cable = create_neighbor_cable(d, dim, k=k, k_count=k_count)
@@ -323,7 +311,7 @@ for k in k_list:
     for run in range(1, max_runs+1):
         J = create_coupling_arr(d, dim, k=k, k_count=k_count)
         spin_dict_1 = {} # list of spins
-        spin_dict_2 = {}
+        spin_dict_2 = {} 
         for i in range(0, spin_count):
             random.seed()
             spin_dict_1[i] = random.choice([-1,1])
@@ -336,23 +324,22 @@ for k in k_list:
         t = results[1]
         q_list.append(q)
         t_list.append(t)
-        id = f"[{dim},{d},{k},{k_count},{max_runs}]"
-        with open('7DlayersA.csv', 'a', newline='') as csvfile:
+        id = f"[{dim},{d},{k},{k_count},{max_runs},RF]"
+        with open(os.path.join(os.getcwd(), f"Data\RF\L{d}", f'{dim}DlayersRFL{d}k{k}.csv'), 'a', newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
-            csvwriter.writerow([k, q, t, id])
+            csvwriter.writerow([q, t, id])
         print(f"{id}: Spin test: {run}\n     Overlap: {q}\n     Time : {t} sweeps")
     mean = np.mean(q_list)
     std = np.std(q_list)
     mean_time = np.mean(t_list)
+    time_std = np.std(t_list)
 
     print(f"{dim}-dimensional model with side-length {d}, k = {k}, k count = {k_count}, {max_runs} runs")
     print(f"    Mean overlap: {mean}")
-    print(f"    Standard deviation: {std}")
+    print(f"        Standard deviation: {std}")
     print(f"    Mean survival time: {mean_time}")
+    print(f"        Standard deviation: {time_std}")
     
-    with open('7Dlayers.csv', 'a', newline='') as csvfile:
+    with open(os.path.join(os.getcwd(), f"Data\RF\L{d}", f'{dim}DlayersRFL{d}.csv'), 'a', newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
-            csvwriter.writerow([k, mean, std, mean_time, id])
-
-
-
+            csvwriter.writerow([k, mean, std, mean_time, time_std, id])
